@@ -1,48 +1,74 @@
-module readTests
+module bvhTests
 
+include("../segmentIntersections.jl")
+include("../contours.jl")
 include("../bvhIntersection.jl")
-using .bvhIntersection, BenchmarkTools, Test, Random
+using .segmentIntersections, .contours, .bvhIntersection, BenchmarkTools, Test, Random, CairoMakie, ImplicitBVH
+using ImplicitBVH: BSphere
 
-
-function simple(shape::NTuple{2,Int}, ::Type{T}; ep = (T(300.0), T(2/(1+sqrt(5)))^2)) where T<:Real
+function testIntersections(css)
+	D = length(css[1].lines[1].vertices[1])
+	T = eltype(css[1].lines[1].vertices[1])
 	
-	# input field (random could be stress-test)
-	u = zeros(T, shape...)
-	v = zeros(T, shape...)
-	@inbounds for i in 1:size(u,1), j in 1:size(u,2)
-		x = (i-shape[1]/2)/shape[1]
-		y = (j-shape[2]/2)/shape[2]
-		u[i,j] = sin(ep[1]*(x^2 + y^2))
-		v[i,j] = tanh(x - ep[2]*y)
+	# form BSphere arrays from vertices pair-wise
+	bs = (bvhIntersection.segments2BSpheres(css[1]), bvhIntersection.segments2BSpheres(css[2]))
+	
+	# Build BVHs using bounding boxes for nodes, UInt32 indices
+	bvhs = (BVH(bs[1], BSphere{T}, UInt32), BVH(bs[2], BSphere{T}, UInt32))
+	
+	# Traverse BVH for contact detection
+	traversal = traverse(
+		  bvhs[1],
+		  bvhs[2],
+		  default_start_level(bvhs[1]),
+		  default_start_level(bvhs[2]),
+		  # previous_traversal_cache,
+		  num_threads=16,
+	)
+	
+	cache = intersectionCache{2D,2+D,T}();
+	
+	intersections = Vector{NTuple{D,T}}(undef,0)
+	
+	for ct in traversal.contacts
+		p0, p1 = bvhIntersection.extractSegmentPair(ct[1], css[1])
+		q0, q1 = bvhIntersection.extractSegmentPair(ct[2], css[2])
+		
+		@test all(bs[1][ct[1]].x .≈ bvhIntersection.points2Center(p0,p1))
+		@test bs[1][ct[1]].r 			≈ bvhIntersection.points2Radius(p0,p1)
+		@test all(bs[2][ct[2]].x .≈ bvhIntersection.points2Center(q0,q1))
+		@test bs[2][ct[2]].r 			≈ bvhIntersection.points2Radius(q0,q1)
+
+		fillCache!(cache, p0, p1, q0, q1);
+		solveIntersection!(cache)
+		if !any(isnan.(cache.X))
+			push!(intersections, (cache.X[3], cache.X[4]))
+		end
 	end
-	
-	intersects = find_cores(u; outname="simple_test")
-	@show length(intersects)
-	return nothing
+	return intersections
 end
 
-function needlesslycomplex(shape::NTuple{2,Int}, ::Type{T})
-
+function needlesslycomplex(shape::NTuple{3,Int}, ::Type{T}) where {T<:Real}
 	# input field (random could be stress-test)
 	u = rand(T, shape...).-T(0.5)
-	v = rand(T, shape...).-T(0.5)
-	intersects = find_cores(u; outname="needlesslycomplex")
-	@show length(intersects)
-	return nothing
+	return u
 end
 
-
-
-@test filenameTest(testShape,testt)
-@test filenameTest(testShape,5000) broken=true
-@test filenameTest((testShape...,testt))
-@test readTest1(testShape, testt)
-@test readTest2(testShape, testt)
-
-for readFunction in (read1Benchmark, read2Benchmark)
-	bm = readFunction(testShape, testt);	
-	@test (bm.allocs <= 0) broken=true
-	@test (bm.memory <= 0) broken=true
-	@test (maximum(bm.times)/prod(testShape) <= 25)
+function testall(; outname="test_rand")
+	u = needlesslycomplex((128,128,2), Float32)
+	cs = computeLevels(u)
+	intersections = testIntersections(cs)
+	
+	fig = Figure()
+	ax = Axis(fig[1,1], aspect=DataAspect())
+	contour!(ax, u[:,:,1], levels=[0.0], linewidth=0.25, color=:red)
+	contour!(ax, u[:,:,2], levels=[0.0], linewidth=0.25, color=:blue)
+	scatter!(ax, intersections, markersize=0.5, color=:black)
+	hidedecorations!(ax)
+	save("./$(outname).svg", fig, pt_per_unit=4)
+	return true
 end
+
+@test testall()
+
 end

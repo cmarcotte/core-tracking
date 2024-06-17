@@ -27,7 +27,7 @@ module segmentIntersections
 	where length(B) = 2+D, length(X) = 2+D
 =#
 
-export createCache, fillCache!, checkSolution!, solveIntersection!
+export intersectionCache, createCache, fillCache!, checkSolution!, solveIntersection!
 
 using StaticArrays, LinearAlgebra
 
@@ -116,8 +116,12 @@ end
 
 function solveIntersection!(X::MVector{4,T}, A::MMatrix{4,4,T}, B::MVector{4,T}) where T <: Real
 	#	Special-casing when D=2 since 2D==D+2
-	ldiv!(X, lu!(A), B)	# in-place LU decomposition of A, overwriting X
-	checkSolution!(X)
+	try
+		ldiv!(X, lu!(A), B)	# in-place LU decomposition of A, overwriting X
+		checkSolution!(X)
+	catch
+		fill!(X, T(NaN))
+	end
 	return nothing
 end	
 
