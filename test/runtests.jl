@@ -1,22 +1,11 @@
 using BenchmarkTools, Test
 
-print("Running cache tests...")
-took_seconds = @elapsed include("cacheTests.jl")
-println("done (took ", took_seconds, " seconds)")
+const testNames = ["cache", "read", "iterator", "contour", "bvh"]
+const testFiles = ["$(test)Tests" for test in testNames]
 
-print("Running read tests...")
-took_seconds = @elapsed include("readTests.jl")
-println("done (took ", took_seconds, " seconds)")
-
-print("Running contour tests...")
-took_seconds = @elapsed include("contourTests.jl")
-println("done (took ", took_seconds, " seconds)")
-
-print("Running iterator tests...")
-took_seconds = @elapsed include("iteratorTests.jl")
-println("done (took ", took_seconds, " seconds)")
-
-print("Running BVH tests...")
-took_seconds = @elapsed include("bvhTests.jl")
-println("done (took ", took_seconds, " seconds)")
-
+for (name, file) in zip(testNames, testFiles)
+	tbs = (3-length(name)÷3);
+	print("Running $name tests...", "\t"^tbs)
+	took_seconds = @elapsed include("$(file).jl")
+	print("done. (Elapsed: $took_seconds seconds).\n")
+end

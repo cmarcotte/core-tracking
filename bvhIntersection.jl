@@ -51,19 +51,21 @@ function extractSegmentPair(n::Int, cs)
 end
 
 function computeIntersections(css)
+	D = length(css[1].lines[1].vertices[1])
+	T = eltype(css[1].lines[1].vertices[1])
 	
 	# form BSphere arrays from vertices pair-wise
-	bs = (segments2BSpheres(css[1]), segments2BSpheres(css[2]))
+	bs = (bvhIntersection.segments2BSpheres(css[1]), bvhIntersection.segments2BSpheres(css[2]))
 	
 	# Build BVHs using bounding boxes for nodes, UInt32 indices
-	bvhs = (BVH(bs0, BSphere{T}, UInt32), BVH(bs1, BSphere{T}, UInt32))
+	bvhs = (BVH(bs[1], BSphere{T}, UInt32), BVH(bs[2], BSphere{T}, UInt32))
 	
 	# Traverse BVH for contact detection
 	traversal = traverse(
-		  bvh[1],
-		  bvh[2],
-		  default_start_level(bvh[1]),
-		  default_start_level(bvh[2]),
+		  bvhs[1],
+		  bvhs[2],
+		  default_start_level(bvhs[1]),
+		  default_start_level(bvhs[2]),
 		  # previous_traversal_cache,
 		  num_threads=16,
 	)
@@ -73,13 +75,18 @@ function computeIntersections(css)
 	intersections = Vector{NTuple{D,T}}(undef,0)
 	
 	for ct in traversal.contacts
-		p0, p1 = extractSegmentPair(ct[1], css[1])
-		q0, q1 = extractSegmentPair(ct[2], css[2])
-				
+		p0, p1 = bvhIntersection.extractSegmentPair(ct[1], css[1])
+		q0, q1 = bvhIntersection.extractSegmentPair(ct[2], css[2])
+		#=
+		@test all(bs[1][ct[1]].x .≈ bvhIntersection.points2Center(p0,p1))
+		@test bs[1][ct[1]].r 			≈ bvhIntersection.points2Radius(p0,p1)
+		@test all(bs[2][ct[2]].x .≈ bvhIntersection.points2Center(q0,q1))
+		@test bs[2][ct[2]].r 			≈ bvhIntersection.points2Radius(q0,q1)
+		=#
 		fillCache!(cache, p0, p1, q0, q1);
 		solveIntersection!(cache)
 		if !any(isnan.(cache.X))
-			push!(intersections, cache.X[3:4])
+			push!(intersections, (cache.X[3], cache.X[4]))
 		end
 	end
 	return intersections

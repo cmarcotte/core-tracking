@@ -8,15 +8,15 @@ export readFile!, filename
 
 using FileIO, Printf
 
-@inline function fastread(io, x)
-	unsafe_read(io, pointer(x), UInt(prod(size(x))));
+@inline function fastread!(io, x)
+	unsafe_read(io, pointer(x), UInt(prod(size(x)))*sizeof(eltype(x)));
 end
 
-@inline function slowread(io, x)
+@inline function slowread!(io, x)
 	read!(io, x);
 end
 
-function readFile!(x::Array{T,D}, fname::String, rfn = fastread) where {T<:AbstractFloat, D}
+function readFile!(x::Array{T,D}, fname::String, rfn = fastread!) where {T<:AbstractFloat, D}
 	open(fname,"r") do io
 	   read(io, Float32);
 	   rfn(io, x)
@@ -24,13 +24,11 @@ function readFile!(x::Array{T,D}, fname::String, rfn = fastread) where {T<:Abstr
 	return nothing
 end
 
-function readFile!(x::Array{T,D}, y::Array{T,D}, fname::String) where {T<:AbstractFloat, D}
+function readFile!(x::Array{T,D}, y::Array{T,D}, fname::String, rfn = fastread!) where {T<:AbstractFloat, D}
 	open(fname,"r") do io
 		read(io, Float32);
-		#read!(io, x);
-		unsafe_read(io, pointer(x), UInt(prod(size(x))))
-		read!(io, y);
-		unsafe_read(io, pointer(y), UInt(prod(size(y))))
+		rfn(io, x)
+		rfn(io, y)
 	end
 	return nothing
 end

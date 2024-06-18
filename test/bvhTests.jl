@@ -63,7 +63,7 @@ function testall(; outname="test_rand")
 	ax = Axis(fig[1,1], aspect=DataAspect())
 	contour!(ax, u[:,:,1], levels=[0.0], linewidth=0.25, color=:red)
 	contour!(ax, u[:,:,2], levels=[0.0], linewidth=0.25, color=:blue)
-	scatter!(ax, intersections, markersize=0.5, color=:black)
+	scatter!(ax, intersections, markersize=1, color=:black)
 	hidedecorations!(ax)
 	save("./$(outname).svg", fig, pt_per_unit=4)
 	return true

@@ -11,6 +11,15 @@ function initPoints(D::Int64, ::Type{T}) where T<:Real
 	return (p0, p1, q0, q1)
 end
 
+function initPara(D::Int64, ::Type{T}) where T<:Real
+	p0 = ntuple(d->rand(T), Val(D))
+	p1 = ntuple(d->rand(T), Val(D))
+	dp = randn(T)
+	q0 = p0 .+ dp
+	q1 = p1 .+ dp
+	return (p0, p1, q0, q1)
+end
+
 function buildCacheTest(D::Int64, ::Type{T}) where T<:Real
 	(p0, p1, q0, q1) = initPoints(D, T)
 	cache = createCache(p0, p1, q0, q1)

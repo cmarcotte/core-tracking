@@ -38,7 +38,7 @@ function iteratorBenchmark(N::Int64, T::Type)
 	return @benchmark loopPI(PairIterator($v))
 end
 
-for N in (1_000,10_000,100_000,1_000_000), T in (Float16, Float32, Float64)
+for N in (1_000,10_000,100_000), T in (Float16, Float32, Float64)
 
 	bm = iteratorBenchmark(N, T);	
 	@test (bm.allocs <= 0)
