@@ -3,7 +3,8 @@ module bvhTests
 include("../segmentIntersections.jl")
 include("../contours.jl")
 include("../bvhIntersection.jl")
-using .segmentIntersections, .contours, .bvhIntersection, BenchmarkTools, Test, Random, CairoMakie, ImplicitBVH
+include("../dataParser.jl")
+using .dataParser, .segmentIntersections, .contours, .bvhIntersection, BenchmarkTools, Test, Random, CairoMakie, ImplicitBVH
 using ImplicitBVH: BSphere
 
 function testIntersections(css)
@@ -60,6 +61,18 @@ function simple(shape::NTuple{2,Int}, ::Type{T}; ep = (T(300.0), T(2/(1+sqrt(5))
 	return u
 end
 
+function reasonable(shape::NTuple{2,Int}, ::Type{T}) where {T<:Real}
+	x = Array{T,4}(undef, shape..., 1, 3);
+	y = Array{T,4}(undef, shape..., 1, 3);
+	dataDir = "/home/chris/Development/fenkar_program/out/"
+	t = rand(Xoshiro(1234), 1:1000)
+	fname = filename(dataDir, (shape...,1,t))
+	if !isnothing(fname)
+		readFile!(x, y, fname)
+	end
+	return y[:,:,1,1:2]
+end
+
 function needlesslycomplex(shape::NTuple{2,Int}, ::Type{T}) where {T<:Real}
 	# input field (random could be stress-test)
 	u = rand(Xoshiro(1234), T, shape..., 2).-T(0.5)
@@ -82,7 +95,7 @@ function testall(initFn::F, shape::NTuple{2,Int}, ::Type{T}; outname="$(initFn)"
 end
 
 @test testall(simple, (128,128), Float32)
-
+@test testall(reasonable, (512,512), Float32)
 @test testall(needlesslycomplex, (128,128), Float32)
 
 end
