@@ -48,27 +48,41 @@ function testIntersections(css)
 	return intersections
 end
 
-function needlesslycomplex(shape::NTuple{3,Int}, ::Type{T}) where {T<:Real}
+function simple(shape::NTuple{2,Int}, ::Type{T}; ep = (T(300.0), T(2/(1+sqrt(5)))^2)) where T<:Real
 	# input field (random could be stress-test)
-	u = rand(T, shape...).-T(0.5)
+	u = zeros(T, shape..., 2)
+	@inbounds for i in 1:shape[1], j in 1:shape[2]
+		x = (i-shape[1]/2)/shape[1]
+		y = (j-shape[2]/2)/shape[2]
+		u[i,j,1] = sin(ep[1]*(x^2 + y^2))
+		u[i,j,2] = tanh(x - ep[2]*y)
+	end
 	return u
 end
 
-function testall(; outname="test_rand")
-	u = needlesslycomplex((128,128,2), Float32)
+function needlesslycomplex(shape::NTuple{2,Int}, ::Type{T}) where {T<:Real}
+	# input field (random could be stress-test)
+	u = rand(Xoshiro(1234), T, shape..., 2).-T(0.5)
+	return u
+end
+
+function testall(initFn::F, shape::NTuple{2,Int}, ::Type{T}; outname="$(initFn)") where {F<:Function,T<:Real}
+	u = initFn(shape, T)
 	cs = computeLevels(u)
 	intersections = testIntersections(cs)
 	
 	fig = Figure()
 	ax = Axis(fig[1,1], aspect=DataAspect())
-	contour!(ax, u[:,:,1], levels=[0.0], linewidth=0.25, color=:red)
-	contour!(ax, u[:,:,2], levels=[0.0], linewidth=0.25, color=:blue)
-	scatter!(ax, intersections, markersize=1, color=:black)
+	contour!(ax, u[:,:,1], levels=[0.0], linewidth=0.5, color=:red)
+	contour!(ax, u[:,:,2], levels=[0.0], linewidth=0.5, color=:blue)
+	scatter!(ax, intersections, markersize=3, color=:black)
 	hidedecorations!(ax)
 	save("./$(outname).svg", fig, pt_per_unit=4)
 	return true
 end
 
-@test testall()
+@test testall(simple, (128,128), Float32)
+
+@test testall(needlesslycomplex, (128,128), Float32)
 
 end
