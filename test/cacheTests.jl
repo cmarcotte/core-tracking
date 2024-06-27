@@ -50,7 +50,7 @@ function checkTest(D::Int64, ::Type{T}) where T<:Real
 	return true
 end
 
-for T in (Float16, Float32, Float64), D in (2,3)
+for T in (Float16, Float32, Float64), D in (2, 3)
 	@test buildCacheTest(D,T)
 	@test fillCacheTest(D,T)
 	@test solveTest(D, T)
@@ -59,15 +59,52 @@ end
 
 function benchmarkCache(D::Int64, ::Type{T}) where T<:Real
 	(p0, p1, q0, q1) = initPoints(D, T)
-	return @benchmark createCache($p0, $p1, $q0, $q1)
+	return @benchmarkable createCache($p0, $p1, $q0, $q1)
 end
 
-@test (benchmarkCache(2, Float32).allocs <= 4)
-@test (benchmarkCache(2, Float32).memory <= 192)
-@test (minimum(benchmarkCache(2, Float32).times) <= 20)
+let T = Float32
+	bc = benchmarkCache(2, Float32)
+	bcr = run(bc);
 
-@test (benchmarkCache(3, Float32).allocs <= 6)
-@test (benchmarkCache(3, Float32).memory <= 480)
-@test (minimum(benchmarkCache(3, Float32).times) <= 80)
+	@test (bcr.allocs <= 4)
+	@test (bcr.memory <= 192)
+	@test (minimum(bcr.times) <= 20)
+
+	bc = benchmarkCache(3, Float32)
+	bcr = run(bc);
+	
+	@test (bcr.allocs <= 6)
+	@test (bcr.memory <= 480)
+	@test (minimum(bcr.times) <= 80)
+end
+
+function saveBench(bench, filename)
+	#BenchmarkTools.save("$(filename).json", bench)
+	open("$(filename).dat", "w") do io
+		show(io, MIME("text/plain"), bench) 
+	end
+	return nothing
+end
+
+const savedir="./test/bench"
+
+for T in (Float16, Float32, Float64), D in (2, 3)
+	let (p0, p1, q0, q1) = initPoints(D, T)
+		mkpath(savedir);
+		cache = createCache(p0, p1, q0, q1)
+		fbm = @benchmarkable fillCache!($cache, $p0, $p1, $q0, $q1)
+		tune!(fbm);
+		rfbm = run(fbm)
+		saveBench(rfbm, "$(savedir)/rfbm_$(T)_$(D)")
+		sbm = @benchmarkable solveIntersection!($cache) setup=(fillCache!($cache, $p0, $p1, $q0, $q1))
+		tune!(sbm);
+		rsbm = run(sbm)
+		saveBench(rsbm, "$(savedir)/rsbm_$(T)_$(D)")
+		cbm = @benchmarkable checkSolution!($cache.X) setup=(fillCache!($cache, $p0, $p1, $q0, $q1); solveIntersection!($cache);)
+		tune!(cbm);
+		rcbm = run(cbm)
+		saveBench(rcbm, "$(savedir)/rcbm_$(T)_$(D)")
+	end
+end
 
 end
